@@ -3,8 +3,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#26e4d3">
-<link rel="manifest" href="./manifest.webmanifest">
-<link rel="apple-touch-icon" href="./icon-180.png">
+<link rel="manifest" href="./manifest.webmanifest?v=2">
+<link rel="apple-touch-icon" href="./icon-180.png?v=2">
 <link rel="icon" type="image/png" href="./icon-192.png">
 <title>スマッホをほおーりゃ | Phone Toss</title>
 <style>
@@ -26,7 +26,12 @@ h1{font-size:clamp(1.25rem,5.7vw,2.5rem);margin:.2em 0 0;letter-spacing:-.045em;
 button{width:100%;font:inherit;font-weight:900;min-height:52px;padding:10px 16px;border:3px solid var(--ink);border-radius:15px;cursor:pointer;color:var(--ink);box-shadow:4px 4px var(--ink)}
 button:active:enabled{transform:translate(3px,3px);box-shadow:1px 1px var(--ink)}
 #start{background:var(--pink)}
-#demo{margin-top:12px;background:var(--paper)}
+#records{margin-top:24px;border:2px solid var(--ink);border-radius:16px;background:var(--paper);padding:14px}
+#records h2{font-size:1.1rem;margin:0 0 8px}
+#records p{margin:0}
+#history{list-style:none;padding:0;margin:0;max-height:18rem;overflow:auto}
+#history li{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;padding:8px 0;border-top:1px solid var(--ink)}
+#history time{font-size:.875rem}
 button:disabled{opacity:.6;cursor:default}
 button:focus-visible,summary:focus-visible{outline:3px solid var(--ink);outline-offset:5px}
 details{border:2px solid var(--ink);border-radius:12px;background:var(--paper);padding:10px 14px;margin-top:12px}
@@ -43,7 +48,11 @@ small{font-size:.875rem}
 </section>
 <p class="status" id="status" role="status">加速度センサーで、手を離れてからキャッチするまでの時間を測ります。</p>
 <button id="start">計測を開始</button>
-<button id="demo">デモで試す</button>
+<section id="records" aria-labelledby="records-title">
+<h2 id="records-title">計測履歴</h2>
+<p id="history-empty">計測結果がここに残ります。</p>
+<ul id="history" aria-label="保存した計測結果"></ul>
+</section>
 <details><summary>測り方と注意点</summary>
 <p>許可を求められたら、モーションセンサーを許可してください。計測待機中に端末を上に軽く放り、手を離した位置と同じ高さでキャッチします。</p>
 <p>加速度がほぼゼロになった時刻からキャッチまでの時間を <var>t</var> として、最高点までの高さを 9.80665 × <var>t</var>² ÷ 8 で推定します。端末の回転やセンサーの更新間隔で誤差が出ます。床への衝突もキャッチと判定されることがあります。</p>
@@ -113,31 +122,81 @@ export function createDetector() {
 
 const element = id => document.getElementById(id);
 const start = element('start');
-const demo = element('demo');
 const status = element('status');
 let mode = 'idle';
 let detector;
 let timer;
 let hasSamples;
 let lastPhase;
+const historyKey = 'phone-toss-history';
+const dateFormat = new Intl.DateTimeFormat('ja-JP', { dateStyle: 'short', timeStyle: 'short' });
+
+function readHistory() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(historyKey) ?? '[]');
+    return Array.isArray(saved) ? saved.filter(record =>
+      record && Number.isFinite(record.centimeters) && Number.isFinite(record.seconds) &&
+      typeof record.date === 'string' && Number.isFinite(Date.parse(record.date))
+    ) : [];
+  } catch {
+    return [];
+  }
+}
+
+let records = readHistory();
+
+function renderHistory() {
+  element('history-empty').hidden = records.length > 0;
+  const list = element('history');
+  list.replaceChildren();
+  for (const record of records) {
+    const row = document.createElement('li');
+    const measurement = document.createElement('strong');
+    const date = document.createElement('time');
+    measurement.textContent = record.centimeters.toFixed(1) + ' cm / ' + record.seconds.toFixed(3) + ' 秒';
+    date.dateTime = record.date;
+    date.textContent = dateFormat.format(new Date(record.date));
+    row.append(measurement, date);
+    list.append(row);
+  }
+}
+
+function saveResult({ centimeters, seconds }) {
+  const updated = [{ centimeters, seconds, date: new Date().toISOString() }, ...readHistory()];
+  try {
+    localStorage.setItem(historyKey, JSON.stringify(updated));
+  } catch {
+    return false;
+  }
+  records = updated;
+  renderHistory();
+  return true;
+}
+
+renderHistory();
+window.addEventListener('storage', event => {
+  if (event.key === historyKey || event.key === null) {
+    records = readHistory();
+    renderHistory();
+  }
+});
 
 function stop(message) {
   window.removeEventListener('devicemotion', onMotion);
   clearTimeout(timer);
   mode = 'idle';
-  start.disabled = demo.disabled = false;
+  start.disabled = false;
   start.textContent = '計測を開始';
   status.textContent = message;
 }
 
-function prepare(nextMode) {
-  mode = nextMode;
+function prepare() {
+  mode = 'sensor';
   detector = createDetector();
   lastPhase = '';
   element('height').textContent = '—';
   element('duration').textContent = '— 秒';
   element('accel').textContent = '— m/s²';
-  element('label').textContent = nextMode === 'demo' ? '推定の高さ（デモ）' : '推定の高さ';
 }
 
 function feed(time, magnitude) {
@@ -146,12 +205,12 @@ function feed(time, magnitude) {
   if (result.phase === 'result') {
     element('height').textContent = result.centimeters.toFixed(1);
     element('duration').textContent = result.seconds.toFixed(3) + ' 秒';
-    stop(mode === 'demo' ? 'デモ完了。模擬データで高さを計算しました。' : 'キャッチを検知しました。');
+    stop(saveResult(result) ? '計測結果を保存しました。' : 'キャッチを検知しました。履歴を保存できませんでした。');
     start.textContent = 'もう一度計測';
   } else if (result.phase !== lastPhase) {
     lastPhase = result.phase;
     status.textContent = result.phase === 'flight' ? '滞空中…' :
-      mode === 'demo' ? '模擬データで計測中…' : '計測待機中。端末を手に持ち、軽く放り上げてください。';
+      '計測待機中。端末を手に持ち、軽く放り上げてください。';
   }
 }
 
@@ -172,10 +231,10 @@ start.addEventListener('click', async () => {
     return;
   }
   if (!window.isSecureContext || !window.DeviceMotionEvent) {
-    stop('センサーに対応したスマホのブラウザで HTTPS のページを開いてください。デモも試せます。');
+    stop('センサーに対応したスマホのブラウザで HTTPS のページを開いてください。');
     return;
   }
-  start.disabled = demo.disabled = true;
+  start.disabled = true;
   try {
     if (typeof DeviceMotionEvent.requestPermission === 'function' &&
         await DeviceMotionEvent.requestPermission() !== 'granted') {
@@ -186,7 +245,7 @@ start.addEventListener('click', async () => {
     stop('モーションセンサーの許可を取得できませんでした。');
     return;
   }
-  prepare('sensor');
+  prepare();
   hasSamples = false;
   start.disabled = false;
   start.textContent = '計測を停止';
@@ -195,20 +254,6 @@ start.addEventListener('click', async () => {
   timer = setTimeout(() => stop(
     'センサーのデータを受信できませんでした。スマホのブラウザ設定をご確認ください。'
   ), 4000);
-});
-
-demo.addEventListener('click', () => {
-  prepare('demo');
-  start.disabled = demo.disabled = true;
-  const data = [9.8, 10, 13, 17, ...Array.from({ length: 24 }, () => 0.4), 21];
-  let index = 0;
-  function tick() {
-    feed(index * 20, data[index]);
-    index++;
-    if (mode === 'demo' && index < data.length) timer = setTimeout(tick, 20);
-    else if (mode === 'demo') stop('デモの計測を終了しました。');
-  }
-  tick();
 });
 
 document.addEventListener('visibilitychange', () => {
