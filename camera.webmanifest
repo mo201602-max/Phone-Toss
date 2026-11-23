@@ -1,0 +1,29 @@
+{
+  "id": "./camera.html",
+  "name": "スマッホをほおーりゃ 撮影版",
+  "short_name": "ほおーりゃ 撮影",
+  "lang": "ja",
+  "start_url": "./camera.html",
+  "scope": "./",
+  "display": "standalone",
+  "theme_color": "#26e4d3",
+  "background_color": "#26e4d3",
+  "icons": [
+    {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "./icon-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

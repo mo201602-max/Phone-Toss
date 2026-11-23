@@ -7,40 +7,11 @@
 <link rel="apple-touch-icon" href="./icon-180.png?v=2">
 <link rel="icon" type="image/png" href="./icon-192.png">
 <title>スマッホをほおーりゃ | Phone Toss</title>
-<style>
-*{box-sizing:border-box}
-:root{--ink:#142544;--paper:#fff9cf;--yellow:#ffdf38;--pink:#ff66a9}
-body{margin:0;color:var(--ink);background:#26e4d3 radial-gradient(circle at 12px 12px,#129c9b55 2px,transparent 3px) 0 0/33px 33px;font:1rem/1.6 system-ui,sans-serif}
-main{max-width:540px;margin:auto;padding:clamp(24px,6vw,48px) 22px 34px}
-header{display:flex;align-items:center;gap:14px}
-header img{width:62px;height:62px;border:3px solid var(--ink);border-radius:18px;box-shadow:3px 4px var(--ink)}
-.brand{display:inline-block;background:var(--pink);border:2px solid var(--ink);padding:0 10px;border-radius:6px;font-size:.875rem;letter-spacing:.14em;text-transform:uppercase;font-weight:900;transform:rotate(-4deg)}
-h1{font-size:clamp(1.25rem,5.7vw,2.5rem);margin:.2em 0 0;letter-spacing:-.045em;line-height:1.2;font-weight:950}
-.panel{border:3px solid var(--ink);border-radius:26px 35px 24px 31px;background:var(--yellow);padding:24px;margin-top:26px;box-shadow:6px 7px var(--ink)}
-.label{font-size:.875rem;font-weight:800}
-.score{font-size:clamp(3.6rem,15vw,5rem);font-weight:950;line-height:1.1;letter-spacing:-.06em;font-variant-numeric:tabular-nums}
-.unit{font-size:1.35rem;margin-left:.35em;letter-spacing:0}
-.metrics{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:20px;padding:12px 14px;border:2px solid var(--ink);border-radius:14px;background:var(--paper)}
-.metric{font-variant-numeric:tabular-nums;font-weight:800}
-.status{margin:24px 0 13px;min-height:3.2em;font-weight:650}
-button{width:100%;font:inherit;font-weight:900;min-height:52px;padding:10px 16px;border:3px solid var(--ink);border-radius:15px;cursor:pointer;color:var(--ink);box-shadow:4px 4px var(--ink)}
-button:active:enabled{transform:translate(3px,3px);box-shadow:1px 1px var(--ink)}
-#start{background:var(--pink)}
-#records{margin-top:24px;border:2px solid var(--ink);border-radius:16px;background:var(--paper);padding:14px}
-#records h2{font-size:1.1rem;margin:0 0 8px}
-#records p{margin:0}
-#history{list-style:none;padding:0;margin:0;max-height:18rem;overflow:auto}
-#history li{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;padding:8px 0;border-top:1px solid var(--ink)}
-#history time{font-size:.875rem}
-button:disabled{opacity:.6;cursor:default}
-button:focus-visible,summary:focus-visible{outline:3px solid var(--ink);outline-offset:5px}
-details{border:2px solid var(--ink);border-radius:12px;background:var(--paper);padding:10px 14px;margin-top:12px}
-details:first-of-type{margin-top:23px}
-summary{cursor:pointer;font-weight:800}
-small{font-size:.875rem}
-</style>
+<link rel="stylesheet" href="./style.css">
+
 <main>
 <header><img src="./icon-192.png" width="62" height="62" alt=""><div><div class="brand" lang="en">Phone Toss</div><h1>スマッホをほおーりゃ</h1></div></header>
+<a class="version" href="./camera.html">撮影版を開く</a>
 <section class="panel" aria-label="測定結果">
 <div class="label" id="label">推定の高さ</div><div class="score"><span id="height">—</span><span class="unit">cm</span></div>
 <div class="metrics"><div><div class="label">滞空時間</div><div class="metric" id="duration">— 秒</div></div>
@@ -49,9 +20,9 @@ small{font-size:.875rem}
 <p class="status" id="status" role="status">加速度センサーで、手を離れてからキャッチするまでの時間を測ります。</p>
 <button id="start">計測を開始</button>
 <section id="records" aria-labelledby="records-title">
-<h2 id="records-title">計測履歴</h2>
+<h2 id="records-title">高さランキング ベスト20</h2>
 <p id="history-empty">計測結果がここに残ります。</p>
-<ul id="history" aria-label="保存した計測結果"></ul>
+<ol id="history" aria-label="高さ順の計測結果"></ol>
 </section>
 <details><summary>測り方と注意点</summary>
 <p>許可を求められたら、モーションセンサーを許可してください。計測待機中に端末を上に軽く放り、手を離した位置と同じ高さでキャッチします。</p>
@@ -63,201 +34,5 @@ small{font-size:.875rem}
 <p><strong>Android（Chrome）</strong>　右上のメニューから「ホーム画面に追加」または「アプリをインストール」を選びます。</p>
 </details>
 </main>
-<script type="module">
-export const gravity = 9.80665;
-
-function crossing(previous, current, threshold) {
-  const fraction = (threshold - previous.value) / (current.value - previous.value);
-  return previous.time + fraction * (current.time - previous.time);
-}
-
-export function createDetector() {
-  const releaseThreshold = 2.5;
-  const contactThreshold = 6;
-  let previous;
-  let release;
-  let lowSamples = 0;
-  let contact;
-  let lastThrust = -Infinity;
-  return function sample(time, value) {
-    const current = { time, value };
-    const prior = previous;
-    previous = current;
-    if (!prior || time - prior.time > 100) {
-      release = contact = undefined;
-      lowSamples = 0;
-      lastThrust = -Infinity;
-    }
-    if (value >= 12) lastThrust = time;
-    if (release === undefined) {
-      if (prior && time - prior.time <= 100 && prior.value > releaseThreshold &&
-          value <= releaseThreshold && time - lastThrust <= 450) {
-        release = crossing(prior, current, releaseThreshold);
-        lowSamples = 1;
-      }
-      return { phase: 'ready' };
-    }
-    if (value <= releaseThreshold) {
-      lowSamples++;
-      contact = undefined;
-    }
-    if (value >= contactThreshold && contact === undefined) {
-      contact = prior.value < contactThreshold ? crossing(prior, current, contactThreshold) : time;
-    }
-    const elapsed = (contact ?? time) - release;
-    if (elapsed > 2500 || (contact !== undefined && (elapsed < 90 || lowSamples < 2))) {
-      release = contact = undefined;
-      lowSamples = 0;
-      return { phase: 'ready' };
-    }
-    if (contact !== undefined && value >= contactThreshold && (value >= 15 || time - contact >= 25)) {
-      const seconds = elapsed / 1000;
-      release = contact = undefined;
-      lowSamples = 0;
-      return { phase: 'result', seconds, centimeters: 100 * gravity * seconds ** 2 / 8 };
-    }
-    return { phase: lowSamples >= 2 && elapsed >= 45 ? 'flight' : 'ready' };
-  };
-}
-
-const element = id => document.getElementById(id);
-const start = element('start');
-const status = element('status');
-let mode = 'idle';
-let detector;
-let timer;
-let hasSamples;
-let lastPhase;
-const historyKey = 'phone-toss-history';
-const dateFormat = new Intl.DateTimeFormat('ja-JP', { dateStyle: 'short', timeStyle: 'short' });
-
-function readHistory() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(historyKey) ?? '[]');
-    return Array.isArray(saved) ? saved.filter(record =>
-      record && Number.isFinite(record.centimeters) && Number.isFinite(record.seconds) &&
-      typeof record.date === 'string' && Number.isFinite(Date.parse(record.date))
-    ) : [];
-  } catch {
-    return [];
-  }
-}
-
-let records = readHistory();
-
-function renderHistory() {
-  element('history-empty').hidden = records.length > 0;
-  const list = element('history');
-  list.replaceChildren();
-  for (const record of records) {
-    const row = document.createElement('li');
-    const measurement = document.createElement('strong');
-    const date = document.createElement('time');
-    measurement.textContent = record.centimeters.toFixed(1) + ' cm / ' + record.seconds.toFixed(3) + ' 秒';
-    date.dateTime = record.date;
-    date.textContent = dateFormat.format(new Date(record.date));
-    row.append(measurement, date);
-    list.append(row);
-  }
-}
-
-function saveResult({ centimeters, seconds }) {
-  const updated = [{ centimeters, seconds, date: new Date().toISOString() }, ...readHistory()];
-  try {
-    localStorage.setItem(historyKey, JSON.stringify(updated));
-  } catch {
-    return false;
-  }
-  records = updated;
-  renderHistory();
-  return true;
-}
-
-renderHistory();
-window.addEventListener('storage', event => {
-  if (event.key === historyKey || event.key === null) {
-    records = readHistory();
-    renderHistory();
-  }
-});
-
-function stop(message) {
-  window.removeEventListener('devicemotion', onMotion);
-  clearTimeout(timer);
-  mode = 'idle';
-  start.disabled = false;
-  start.textContent = '計測を開始';
-  status.textContent = message;
-}
-
-function prepare() {
-  mode = 'sensor';
-  detector = createDetector();
-  lastPhase = '';
-  element('height').textContent = '—';
-  element('duration').textContent = '— 秒';
-  element('accel').textContent = '— m/s²';
-}
-
-function feed(time, magnitude) {
-  element('accel').textContent = magnitude.toFixed(1) + ' m/s²';
-  const result = detector(time, magnitude);
-  if (result.phase === 'result') {
-    element('height').textContent = result.centimeters.toFixed(1);
-    element('duration').textContent = result.seconds.toFixed(3) + ' 秒';
-    stop(saveResult(result) ? '計測結果を保存しました。' : 'キャッチを検知しました。履歴を保存できませんでした。');
-    start.textContent = 'もう一度計測';
-  } else if (result.phase !== lastPhase) {
-    lastPhase = result.phase;
-    status.textContent = result.phase === 'flight' ? '滞空中…' :
-      '計測待機中。端末を手に持ち、軽く放り上げてください。';
-  }
-}
-
-function onMotion(event) {
-  const vector = event.accelerationIncludingGravity;
-  if (!vector || ![vector.x, vector.y, vector.z].every(Number.isFinite)) return;
-  if (!hasSamples) {
-    hasSamples = true;
-    clearTimeout(timer);
-    timer = setTimeout(() => stop('計測時間が終了しました。再度お試しください。'), 30000);
-  }
-  feed(event.timeStamp, Math.hypot(vector.x, vector.y, vector.z));
-}
-
-start.addEventListener('click', async () => {
-  if (mode === 'sensor') {
-    stop('計測を停止しました。');
-    return;
-  }
-  if (!window.isSecureContext || !window.DeviceMotionEvent) {
-    stop('センサーに対応したスマホのブラウザで HTTPS のページを開いてください。');
-    return;
-  }
-  start.disabled = true;
-  try {
-    if (typeof DeviceMotionEvent.requestPermission === 'function' &&
-        await DeviceMotionEvent.requestPermission() !== 'granted') {
-      stop('モーションセンサーが許可されていません。ブラウザの設定をご確認ください。');
-      return;
-    }
-  } catch {
-    stop('モーションセンサーの許可を取得できませんでした。');
-    return;
-  }
-  prepare();
-  hasSamples = false;
-  start.disabled = false;
-  start.textContent = '計測を停止';
-  status.textContent = 'センサーを確認中…';
-  window.addEventListener('devicemotion', onMotion);
-  timer = setTimeout(() => stop(
-    'センサーのデータを受信できませんでした。スマホのブラウザ設定をご確認ください。'
-  ), 4000);
-});
-
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden && mode === 'sensor') stop('画面を離れたため、計測を停止しました。');
-});
-</script>
+<script type="module" src="./app.js"></script>
 </html>
