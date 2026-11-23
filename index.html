@@ -2,32 +2,40 @@
 <html lang="ja">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#111528">
+<meta name="theme-color" content="#26e4d3">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icon-180.png">
+<link rel="icon" type="image/png" href="./icon-192.png">
 <title>スマッホをほおーりゃ | Phone Toss</title>
 <style>
 *{box-sizing:border-box}
-body{margin:0;background:#111528;color:#faf9ff;font:1rem/1.6 system-ui,sans-serif}
-main{max-width:540px;margin:auto;padding:clamp(24px,6vw,48px) 22px}
-.brand{color:#bcabff;font-weight:750;letter-spacing:.17em;text-transform:uppercase;font-size:.875rem}
-h1{font-size:clamp(1.65rem,7vw,2.6rem);margin:.12em 0 .5em;letter-spacing:-.04em}
-.panel{position:relative;overflow:hidden;border:1px solid #43446b;border-radius:25px;background:radial-gradient(ellipse at 95% 0%,#393266 0,transparent 66%),#1c213b;padding:24px;margin-top:24px}
-.label{color:#d2cdeb;font-size:.875rem;font-weight:650}
-.score{font-size:clamp(3.6rem,15vw,5rem);font-weight:800;line-height:1.15;letter-spacing:-.06em;font-variant-numeric:tabular-nums}
-.unit{color:#cbbdff;font-size:1.35rem;margin-left:.35em;letter-spacing:0}
-.metrics{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:22px;padding-top:16px;border-top:1px solid #494669}
-.metric{font-variant-numeric:tabular-nums;font-weight:700}
-.status{margin:22px 0 14px;min-height:3.2em;color:#e2ddf8}
-button{font:inherit;font-weight:750;min-height:52px;padding:10px 16px;border-radius:14px;cursor:pointer}
-#start{width:100%;border:0;background:#c3f884;color:#172616}
-#demo{width:100%;margin-top:10px;border:1px solid #5d5a80;background:transparent;color:#f2eeff}
-button:disabled{opacity:.55;cursor:default}
-button:focus-visible,summary:focus-visible{outline:2px solid #fff;outline-offset:4px}
-details{border-top:1px solid #373956;padding-top:16px;margin-top:24px;color:#d2cdeb}
-summary{cursor:pointer;font-weight:700}
-small{font-size:.875rem;color:#d2cdeb}
+:root{--ink:#142544;--paper:#fff9cf;--yellow:#ffdf38;--pink:#ff66a9}
+body{margin:0;color:var(--ink);background:#26e4d3 radial-gradient(circle at 12px 12px,#129c9b55 2px,transparent 3px) 0 0/33px 33px;font:1rem/1.6 system-ui,sans-serif}
+main{max-width:540px;margin:auto;padding:clamp(24px,6vw,48px) 22px 34px}
+header{display:flex;align-items:center;gap:14px}
+header img{width:62px;height:62px;border:3px solid var(--ink);border-radius:18px;box-shadow:3px 4px var(--ink)}
+.brand{display:inline-block;background:var(--pink);border:2px solid var(--ink);padding:0 10px;border-radius:6px;font-size:.875rem;letter-spacing:.14em;text-transform:uppercase;font-weight:900;transform:rotate(-4deg)}
+h1{font-size:clamp(1.25rem,5.7vw,2.5rem);margin:.2em 0 0;letter-spacing:-.045em;line-height:1.2;font-weight:950}
+.panel{border:3px solid var(--ink);border-radius:26px 35px 24px 31px;background:var(--yellow);padding:24px;margin-top:26px;box-shadow:6px 7px var(--ink)}
+.label{font-size:.875rem;font-weight:800}
+.score{font-size:clamp(3.6rem,15vw,5rem);font-weight:950;line-height:1.1;letter-spacing:-.06em;font-variant-numeric:tabular-nums}
+.unit{font-size:1.35rem;margin-left:.35em;letter-spacing:0}
+.metrics{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:20px;padding:12px 14px;border:2px solid var(--ink);border-radius:14px;background:var(--paper)}
+.metric{font-variant-numeric:tabular-nums;font-weight:800}
+.status{margin:24px 0 13px;min-height:3.2em;font-weight:650}
+button{width:100%;font:inherit;font-weight:900;min-height:52px;padding:10px 16px;border:3px solid var(--ink);border-radius:15px;cursor:pointer;color:var(--ink);box-shadow:4px 4px var(--ink)}
+button:active:enabled{transform:translate(3px,3px);box-shadow:1px 1px var(--ink)}
+#start{background:var(--pink)}
+#demo{margin-top:12px;background:var(--paper)}
+button:disabled{opacity:.6;cursor:default}
+button:focus-visible,summary:focus-visible{outline:3px solid var(--ink);outline-offset:5px}
+details{border:2px solid var(--ink);border-radius:12px;background:var(--paper);padding:10px 14px;margin-top:12px}
+details:first-of-type{margin-top:23px}
+summary{cursor:pointer;font-weight:800}
+small{font-size:.875rem}
 </style>
 <main>
-<header><div class="brand" lang="en">Phone Toss</div><h1>スマッホをほおーりゃ</h1></header>
+<header><img src="./icon-192.png" width="62" height="62" alt=""><div><div class="brand" lang="en">Phone Toss</div><h1>スマッホをほおーりゃ</h1></div></header>
 <section class="panel" aria-label="測定結果">
 <div class="label" id="label">推定の高さ</div><div class="score"><span id="height">—</span><span class="unit">cm</span></div>
 <div class="metrics"><div><div class="label">滞空時間</div><div class="metric" id="duration">— 秒</div></div>
@@ -40,6 +48,10 @@ small{font-size:.875rem;color:#d2cdeb}
 <p>許可を求められたら、モーションセンサーを許可してください。計測待機中に端末を上に軽く放り、手を離した位置と同じ高さでキャッチします。</p>
 <p>加速度がほぼゼロになった時刻からキャッチまでの時間を <var>t</var> として、最高点までの高さを 9.80665 × <var>t</var>² ÷ 8 で推定します。端末の回転やセンサーの更新間隔で誤差が出ます。床への衝突もキャッチと判定されることがあります。</p>
 <small>端末の落下や破損を防ぐため、周りに人のいない柔らかい場所で低く試してください。</small>
+</details>
+<details><summary>ホーム画面に追加</summary>
+<p><strong>iPhone（Safari）</strong>　共有メニューから「ホーム画面に追加」を選びます。「Webアプリとして開く」が表示されたらオンにして「追加」を押します。</p>
+<p><strong>Android（Chrome）</strong>　右上のメニューから「ホーム画面に追加」または「アプリをインストール」を選びます。</p>
 </details>
 </main>
 <script type="module">
