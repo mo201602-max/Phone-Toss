@@ -22,7 +22,7 @@
 <button id="start">カメラと計測を開始</button>
 <video id="camera-preview" muted playsinline hidden aria-label="前面カメラのプレビュー"></video>
 <p id="camera-settings" role="status">撮影は最大10 fpsです。</p>
-<p>前面カメラとモーションセンサーを許可してください。撮影データは端末内で処理します。投げる位置とキャッチする位置の高さをそろえてください。</p>
+<p>前面カメラとモーションセンサーを許可してください。露光調整中は顔をプレビュー中央に合わせてください。撮影データは端末内で処理します。投げる位置とキャッチする位置の高さをそろえてください。</p>
 <section id="shots" hidden aria-labelledby="shots-title">
 <h2 id="shots-title">キャッチの瞬間</h2>
 <canvas id="photo" aria-label="スタンプ付きの選択画像"></canvas>
@@ -48,5 +48,5 @@
 <p><strong>Android（Chrome）</strong>　右上のメニューから「ホーム画面に追加」または「アプリをインストール」を選びます。</p>
 </details>
 </main>
-<script type="module" src="./app.js?v=exposure-fallback"></script>
+<script type="module" src="./app.js?v=indoor-exposure"></script>
 </html>

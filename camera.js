@@ -2,22 +2,36 @@ const FRAME_INTERVAL = 100;
 const BUFFER_WINDOW = 3000;
 const AFTER_CATCH = 1000;
 
-export async function setShortestExposure(track) {
+export async function chooseIndoorExposure(track, checkPicture) {
   const capabilities = track.getCapabilities?.();
-  const minimum = capabilities?.exposureTime?.min;
-  if (!capabilities?.exposureMode?.includes('manual') || !Number.isFinite(minimum) ||
-      typeof track.applyConstraints !== 'function') return 'unsupported';
+  const range = capabilities?.exposureTime;
+  if (!capabilities?.exposureMode?.includes('manual') || !Number.isFinite(range?.min) ||
+      !Number.isFinite(range?.max) || typeof track.applyConstraints !== 'function') return 'unsupported';
 
-  try {
-    await track.applyConstraints({
-      advanced: [{ exposureMode: 'manual', exposureTime: minimum }]
-    });
-    const settings = track.getSettings?.();
-    return settings?.exposureMode === 'manual' && settings.exposureTime === minimum
-      ? 'applied' : 'unconfirmed';
-  } catch {
-    return 'unconfirmed';
+  const automatic = track.getSettings?.().exposureTime;
+  const limit = automatic > range.min ? Math.min(range.max, automatic) : range.max;
+  const min = range.min;
+  const step = range.step > 0 ? range.step : 0;
+  const candidates = new Set([min]);
+  for (let i = 1; i <= 7; i++) {
+    const value = Math.expm1(Math.log1p(limit - min) * i / 7) + min;
+    candidates.add(Math.min(limit, step ? min + Math.floor((value - min) / step + 1e-8) * step : value));
   }
+
+  for (const exposureTime of candidates) {
+    try {
+      await track.applyConstraints({ advanced: [{ exposureMode: 'manual', exposureTime }] });
+    } catch {
+      return 'fallback';
+    }
+    const actual = track.getSettings?.();
+    if (actual?.exposureMode !== 'manual' || !Number.isFinite(actual.exposureTime) ||
+        Math.abs(actual.exposureTime - exposureTime) > Math.max(step / 2, exposureTime * 0.01, 1e-9)) {
+      return 'fallback';
+    }
+    if (await checkPicture() === 'visible') return 'applied';
+  }
+  return 'fallback';
 }
 
 export function createCamera(element) {
@@ -82,29 +96,34 @@ export function createCamera(element) {
 
   async function checkPicture() {
     let picture = 'missing';
+    let brightSamples = 0;
     for (let attempt = 0; attempt < 8; attempt++) {
       await new Promise(resolve => setTimeout(resolve, 100));
       if (video.readyState < 2 || !video.videoWidth) continue;
-      sampleContext.drawImage(video, 0, 0, 24, 24);
+      const x = video.videoWidth / 4;
+      const y = video.videoHeight / 4;
+      sampleContext.drawImage(video, x, y, x * 2, y * 2, 0, 0, 24, 24);
       const pixels = sampleContext.getImageData(0, 0, 24, 24).data;
       let lit = 0;
       for (let i = 0; i < pixels.length; i += 4) {
-        if (0.2126 * pixels[i] + 0.7152 * pixels[i + 1] + 0.0722 * pixels[i + 2] >= 24) lit++;
+        if (0.2126 * pixels[i] + 0.7152 * pixels[i + 1] + 0.0722 * pixels[i + 2] >= 32) lit++;
       }
       picture = 'dark';
-      if (lit >= 58) return 'visible';
+      brightSamples = lit >= 231 && attempt > 0 ? brightSamples + 1 : 0;
+      if (brightSamples === 2) return 'visible';
     }
     return picture;
   }
 
   async function start() {
     await openCamera();
-    const exposure = await setShortestExposure(stream.getVideoTracks()[0]);
-    let picture = exposure === 'unconfirmed' ? 'missing' : await checkPicture();
+    const exposure = await chooseIndoorExposure(stream.getVideoTracks()[0], checkPicture);
+    let picture = 'visible';
     let settingsMessage;
-    if (exposure === 'applied' && picture === 'visible') {
-      settingsMessage = '前面カメラの最短露光を適用しました。';
+    if (exposure === 'applied') {
+      settingsMessage = '中央が写る範囲で短い露光時間を選びました。';
     } else if (exposure === 'unsupported') {
+      picture = await checkPicture();
       settingsMessage = '前面カメラは自動露光です。';
     } else {
       // A driver can apply manual exposure while omitting it from getSettings().
@@ -112,7 +131,7 @@ export function createCamera(element) {
       stop();
       await openCamera();
       picture = await checkPicture();
-      settingsMessage = '最短露光で映像を確認できなかったため、自動露光に戻しました。';
+      settingsMessage = '手動露光で中央の明るさを確保できなかったか、設定を確認できなかったため、自動露光に戻しました。';
     }
     if (picture === 'missing') {
       element('camera-settings').textContent = settingsMessage + ' カメラ映像を取得できませんでした。';

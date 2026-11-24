@@ -1,4 +1,4 @@
-import { createCamera } from './camera.js?v=exposure-fallback';
+import { createCamera } from './camera.js?v=indoor-exposure';
 
 export const gravity = 9.80665;
 
@@ -206,7 +206,7 @@ start.addEventListener('click', async () => {
     return;
   }
   if (camera) {
-    status.textContent = '前面カメラを準備中…';
+    status.textContent = '前面カメラの露光を調整中…';
     try {
       await camera.start();
     } catch {
