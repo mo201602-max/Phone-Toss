@@ -25,7 +25,10 @@ export function createCamera(element) {
   const photo = element('photo');
   const slider = element('frame');
   const share = element('share');
-  const video = document.createElement('video');
+  const video = element('camera-preview');
+  const sample = document.createElement('canvas');
+  sample.width = sample.height = 24;
+  const sampleContext = sample.getContext('2d', { willReadFrequently: true });
   video.muted = video.playsInline = true;
   let stream;
   let interval;
@@ -41,6 +44,7 @@ export function createCamera(element) {
     stream?.getTracks().forEach(track => track.stop());
     stream = undefined;
     video.srcObject = null;
+    video.hidden = true;
     buffer = [];
     resolveFinish?.(0);
     resolveFinish = undefined;
@@ -61,7 +65,7 @@ export function createCamera(element) {
     buffer = buffer.filter(item => time - item.time <= BUFFER_WINDOW);
   }
 
-  async function start() {
+  async function openCamera() {
     stream = await navigator.mediaDevices.getUserMedia({
       audio: false,
       video: {
@@ -71,14 +75,53 @@ export function createCamera(element) {
         frameRate: { ideal: 30 }
       }
     });
-    const exposure = await setShortestExposure(stream.getVideoTracks()[0]);
-    element('camera-settings').textContent = {
-      applied: '撮影は最大10 fps。前面カメラの最短露光を適用しました。',
-      unsupported: '撮影は最大10 fps。このブラウザでは前面カメラの露光時間を手動調整できません。',
-      unconfirmed: '撮影は最大10 fps。前面カメラの最短露光を確認できませんでした。'
-    }[exposure];
     video.srcObject = stream;
+    video.hidden = false;
     await video.play();
+  }
+
+  async function checkPicture() {
+    let picture = 'missing';
+    for (let attempt = 0; attempt < 8; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      if (video.readyState < 2 || !video.videoWidth) continue;
+      sampleContext.drawImage(video, 0, 0, 24, 24);
+      const pixels = sampleContext.getImageData(0, 0, 24, 24).data;
+      let lit = 0;
+      for (let i = 0; i < pixels.length; i += 4) {
+        if (0.2126 * pixels[i] + 0.7152 * pixels[i + 1] + 0.0722 * pixels[i + 2] >= 24) lit++;
+      }
+      picture = 'dark';
+      if (lit >= 58) return 'visible';
+    }
+    return picture;
+  }
+
+  async function start() {
+    await openCamera();
+    const exposure = await setShortestExposure(stream.getVideoTracks()[0]);
+    let picture = exposure === 'unconfirmed' ? 'missing' : await checkPicture();
+    let settingsMessage;
+    if (exposure === 'applied' && picture === 'visible') {
+      settingsMessage = '前面カメラの最短露光を適用しました。';
+    } else if (exposure === 'unsupported') {
+      settingsMessage = '前面カメラは自動露光です。';
+    } else {
+      // A driver can apply manual exposure while omitting it from getSettings().
+      // Open a fresh stream to discard the manual constraints.
+      stop();
+      await openCamera();
+      picture = await checkPicture();
+      settingsMessage = '最短露光で映像を確認できなかったため、自動露光に戻しました。';
+    }
+    if (picture === 'missing') {
+      element('camera-settings').textContent = settingsMessage + ' カメラ映像を取得できませんでした。';
+      throw new Error('No camera frames');
+    }
+    if (picture === 'dark') {
+      settingsMessage += ' プレビューがほぼ真っ黒です。明るい場所でもう一度お試しください。';
+    }
+    element('camera-settings').textContent = '最大10 fps。' + settingsMessage;
     panel.hidden = true;
     frames = [];
     capture();

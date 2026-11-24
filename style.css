@@ -40,3 +40,5 @@ small{font-size:.875rem}
 #history{list-style:decimal;padding-left:1.85rem}
 #history li{display:list-item}
 #history time{margin-left:.6rem}
+#camera-preview{display:block;width:100%;max-width:220px;max-height:24vh;margin:16px auto 0;border:2px solid var(--ink);border-radius:12px;transform:scaleX(-1);object-fit:contain}
+#camera-preview[hidden]{display:none}

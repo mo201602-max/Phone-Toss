@@ -1,4 +1,4 @@
-import { createCamera } from './camera.js?v=10fps';
+import { createCamera } from './camera.js?v=exposure-fallback';
 
 export const gravity = 9.80665;
 
