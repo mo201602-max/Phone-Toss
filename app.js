@@ -1,4 +1,4 @@
-import { createCamera } from './camera.js';
+import { createCamera } from './camera.js?v=10fps';
 
 export const gravity = 9.80665;
 

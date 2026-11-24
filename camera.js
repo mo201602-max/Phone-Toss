@@ -1,6 +1,24 @@
-const FRAME_INTERVAL = 200;
+const FRAME_INTERVAL = 100;
 const BUFFER_WINDOW = 3000;
 const AFTER_CATCH = 1000;
+
+export async function setShortestExposure(track) {
+  const capabilities = track.getCapabilities?.();
+  const minimum = capabilities?.exposureTime?.min;
+  if (!capabilities?.exposureMode?.includes('manual') || !Number.isFinite(minimum) ||
+      typeof track.applyConstraints !== 'function') return 'unsupported';
+
+  try {
+    await track.applyConstraints({
+      advanced: [{ exposureMode: 'manual', exposureTime: minimum }]
+    });
+    const settings = track.getSettings?.();
+    return settings?.exposureMode === 'manual' && settings.exposureTime === minimum
+      ? 'applied' : 'unconfirmed';
+  } catch {
+    return 'unconfirmed';
+  }
+}
 
 export function createCamera(element) {
   const panel = element('shots');
@@ -46,8 +64,19 @@ export function createCamera(element) {
   async function start() {
     stream = await navigator.mediaDevices.getUserMedia({
       audio: false,
-      video: { facingMode: 'user', width: { ideal: 320 }, height: { ideal: 240 } }
+      video: {
+        facingMode: 'user',
+        width: { ideal: 320 },
+        height: { ideal: 240 },
+        frameRate: { ideal: 30 }
+      }
     });
+    const exposure = await setShortestExposure(stream.getVideoTracks()[0]);
+    element('camera-settings').textContent = {
+      applied: '撮影は最大10 fps。前面カメラの最短露光を適用しました。',
+      unsupported: '撮影は最大10 fps。このブラウザでは前面カメラの露光時間を手動調整できません。',
+      unconfirmed: '撮影は最大10 fps。前面カメラの最短露光を確認できませんでした。'
+    }[exposure];
     video.srcObject = stream;
     await video.play();
     panel.hidden = true;
